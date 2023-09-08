@@ -10,5 +10,5 @@ export const pollsSchema = joi.object( {
 
 export const choicesSchema = joi.object( {
     title: joi.string().required(),
-    pollId: joi.string() // tirei o required() para cair no erro 404, ao invés do 422. Há solução melhor ?
+    pollId: joi.string().required()
 } )

@@ -39,12 +39,12 @@ export async function getPolls (request, response) {
 
 export async function createChoice (request, response) {
     const { title, pollId } = request.body
-
-    if (!pollId) return response.sendStatus(404)
      
     try {
         const pollObjectId = new ObjectId(pollId)
         const poll = await db.collection("polls").findOne( { _id: pollObjectId } )
+
+        if (!poll) return response.sendStatus(404)
         
         const isPollExpired = dayjs().isAfter( dayjs( poll.expireAt ) )
         if(isPollExpired === true) return response.status(403).send("This poll is expired.")
@@ -105,8 +105,9 @@ export async function registerVote (request, response) {
 export async function showPollResult (request, response) {
     const { id } = request.params
     let isPollExistent
-
-    console.log(id)
+    let choicesVotesArray = []
+    let voteCount
+    let choiceTitle
 
     try {
         // mongoDBConnection()
@@ -119,57 +120,80 @@ export async function showPollResult (request, response) {
         const isPollExpired = dayjs().isAfter( dayjs( poll.expireAt ) )
         if(isPollExpired === true) return response.status(403).send("This poll is expired.")
 
-        const aggregationResult = await db.collection("votes").aggregate([
-            {
-              $group: {
-                _id: "$choiceId",
-                count: { $sum: 1 }
-              }
-            },
-            {
-              $sort: { count: -1 }
-            },
-            {
-              $limit: 1
-            },
-            {
-              $lookup: {
-                from: "choices",
-                localField: "_id", // id do vote
-                foreignField: "_id", // id da choice
-                as: "choiceDetails"
-              }
-            },
-            {
-              $unwind: "$choiceDetails"
-            },
-            {
-              $match: {
-                "choiceDetails.pollId": new ObjectId(id)
-              }
-            },
-            {
-              $project: {
-                _id: 0,
-                pollId: "$choiceDetails.pollId",
-                choiceId: "$choiceDetails._id",
-                choiceTitle: "$choiceDetails.title",
-                voteCount: "$count"
-              }
-            }
-          ]).toArray()
-        
-        console.log(aggregationResult)
+        const choicesOfSelectedPoll = await db.collection("choices").find( { pollId: new ObjectId(id) } ).toArray()
+
+        for (let i = 0; i < choicesOfSelectedPoll.length; i++) {
+          
+          choiceTitle = choicesOfSelectedPoll[i].title;
+          voteCount = await db.collection("votes").find( { choiceId: choicesOfSelectedPoll[i]._id } ).toArray()
+
+          choicesVotesArray.push({
+              choiceTitle: choiceTitle,
+              voteCount: voteCount.length
+            })
+        }
+
+        choicesVotesArray.sort((choiceOne, choiceTwo) => {return choiceTwo.voteCount - choiceOne.voteCount})
 
         const resultObject = {
             _id: poll._id,
             title: poll.title,
             expireAt: poll.expireAt,
             result: {
-                title: aggregationResult[0].choiceTitle,
-                votes: aggregationResult[0].voteCount
+                title: choicesVotesArray[0].choiceTitle,
+                votes: choicesVotesArray[0].voteCount
             }
         }
+        
+        // const aggregationResult = await db.collection("votes").aggregate([
+        //     {
+        //       $group: {
+        //         _id: "$choiceId",
+        //         count: { $sum: 1 }
+        //       }
+        //     },
+        //     {
+        //       $sort: { count: -1 }
+        //     },
+        //     {
+        //       $limit: 1
+        //     },
+        //     {
+        //       $lookup: {
+        //         from: "choices",
+        //         localField: "_id", // id do vote
+        //         foreignField: "_id", // id da choice
+        //         as: "choiceDetails"
+        //       }
+        //     },
+        //     {
+        //       $unwind: "$choiceDetails"
+        //     },
+        //     {
+        //       $match: {
+        //         "choiceDetails.pollId": new ObjectId(id)
+        //       }
+        //     },
+        //     {
+        //       $project: {
+        //         _id: 0,
+        //         pollId: "$choiceDetails.pollId",
+        //         choiceId: "$choiceDetails._id",
+        //         choiceTitle: "$choiceDetails.title",
+        //         voteCount: "$count"
+        //       }
+        //     }
+        //   ]).toArray()
+
+        // const resultObject = {
+        //     _id: poll._id,
+        //     title: poll.title,
+        //     expireAt: poll.expireAt,
+        //     result: {
+        //         title: aggregationResult[0].choiceTitle,
+        //         votes: aggregationResult[0].voteCount
+        //     }
+        // }
         // mongoClient.close()
 
         response.status(201).send(resultObject)
