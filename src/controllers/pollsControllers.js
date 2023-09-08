@@ -109,7 +109,7 @@ export async function showPollResult (request, response) {
     console.log(id)
 
     try {
-        mongoDBConnection()
+        // mongoDBConnection()
 
         isPollExistent = await db.collection("polls").findOne( { _id: new ObjectId(id) } )
         if (!isPollExistent) return response.status(404).send("Poll does not exist.")
@@ -170,7 +170,7 @@ export async function showPollResult (request, response) {
                 votes: aggregationResult[0].voteCount
             }
         }
-        mongoClient.close()
+        // mongoClient.close()
 
         response.status(201).send(resultObject)
 

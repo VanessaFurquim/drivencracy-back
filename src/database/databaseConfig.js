@@ -14,4 +14,6 @@ export async function mongoDBConnection() {
     } catch (error) { console.log(error.message) }
 }
 
+mongoDBConnection()
+
 export const db = mongoClient.db()
